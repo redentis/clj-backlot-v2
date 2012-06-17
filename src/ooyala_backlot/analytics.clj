@@ -1,20 +1,19 @@
-
 (ns ooyala-backlot.analytics
     (:require  [ooyala-backlot.base :as base]))
 
 (def ^:dynamic *service* "/v2/analytics/reports")
 
 (defn account-performance
-  ([config [from to] filter]
-     (base/page-get config [*service* :account :performance filter (str from "..." to)]))
-  ([config [from to]]
-     (base/page-get config [*service* :account :performance :total (str from "..." to)])))
+  ([[from to] filter]
+     (base/page-get [*service* :account :performance filter (str from "..." to)]))
+  ([[from to]]
+     (base/page-get [*service* :account :performance :total (str from "..." to)])))
 
 (defn asset-performance
-  ([config asset-id [from to] filter]
-     (base/page-get config [*service* :asset asset-id :performance filter (str from "..." to)]))
-  ([config asset-id [from to]]
-     (base/page-get config [*service* :asset asset-id :performance :total (str from "..." to)])))
+  ([asset-id [from to] filter]
+     (base/page-get [*service* :asset asset-id :performance filter (str from "..." to)]))
+  ([asset-id [from to]]
+     (base/page-get [*service* :asset asset-id :performance :total (str from "..." to)])))
 
 (defn by-geo [param]
   (clojure.string/join "/"

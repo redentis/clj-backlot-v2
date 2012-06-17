@@ -7,30 +7,35 @@
              (java.net.URLEncoder))
     (:refer-clojure :exclude (get)))
 
-(defn update [m k f & args]
+;; utility functions used in other modules that include base ----------------------------------------
+
+(defn update
+  "Update the value associated with key k in map m with the given function f and the given function arguments."
+  [m k f & args]
   (assoc m k (apply f (m k) args)))
 
-(defn to-json [o] (json/generate-string o))
+(defn to-json
+  "Serialise the given object to a JSON formatted string."
+  [o] (json/generate-string o))
 
-(defn parse-json [s] (json/parse-string s :t))
-
-;(defprotocol Config
-;  (api-key [this])
-;  (secret-key [this])
-;  (default-expiry [this])
-;  (api-base [this]))
+(defn parse-json
+  "Deserialise the given JSON formatted string s to an object."
+  [s] (json/parse-string s :t))
 
 (def default-api-config {
-    :scheme "https"
-    :host "api.ooyala.com"
-    :default-expiry (* 60 60 24)})
-                         
-(defn base64-encode
+                         :scheme "https"
+                         :host "api.ooyala.com"
+                         :default-expiry (* 60 60 24)
+                         :log false})
+
+;; internal functions ----------------------------------------
+
+(defn- base64-encode
   "Encodes the given sequence of bytes into a Base64 String."
   [bytes]    
   (String. (Base64Coder/encode bytes)))
   
-(defn sha256-digest
+(defn- sha256-digest
   "Generate the SHA256 digest of the given string and return as an array of  bytes."
   [^String v]
   (-> (MessageDigest/getInstance "SHA-256") (.digest (.getBytes v))))
@@ -91,9 +96,9 @@
 (defn- default-request
   "Returns a map of the default HTTP client request headers and keywords."
   []
-  {:throw-exceptions false :content-type "text/json" :log-url true})
+  {:throw-exceptions false :content-type "text/json" :log-url false})
 
-(defn wrap-api-request [client]
+(defn- wrap-api-request [client]
   (fn [req]
     (let [resp (client req)]
       (case (get-in resp [:headers "content-type"])
@@ -101,20 +106,29 @@
         (update resp :body parse-json)
         resp))))
 
-(defn wrap-request [request]
+(defn- wrap-request [request]
   (-> request
       wrap-api-request))
 
 (def request (wrap-request #'http/request))
 
-(defn- api-call [method]
-  (fn [config path & [params]]
+;; public API ----------------------------------------
+
+(def ^:dynamic *api-config* default-api-config)
+
+(defmacro with-config [config & body]
+  `(if (map? ~config)
+    (binding [*api-config* ~config] ~@body)
+    (throw (IllegalArgumentException. "Configuration parameter should be a map."))))
+
+(defn api-call [method]
+  "Returns a new function that handles all the API requirements and utilises the given HTTP method to interact with the Backlot API servers."
+  (fn [path & [params]]
     (let [safe-path (map name path)
-          all-params (merge default-api-config config)
-          all-api-params (merge (required-api-params all-params) (dissoc params :body))
+          all-api-params (merge (required-api-params *api-config*) (dissoc params :body))
           body (encode-body params)
-          sig (generate-sig config method safe-path all-api-params body)
-          {:keys [scheme host port]} all-params]
+          sig (generate-sig *api-config* method safe-path all-api-params body)
+          {:keys [scheme host port log]} *api-config*]
       (request (merge (default-request)
                       {:method method
                        :scheme scheme
@@ -122,23 +136,19 @@
                        :server-port port
                        :uri (join \/ safe-path)
                        :query-params (assoc all-api-params :signature sig)
-                       :body body})))))
-
+                       :body body
+                       :log-url log})))))
 
 (def get (api-call :get))
 
-(defn page-get [config path & [params]]
-  (let [data      (get config path params)
-        next-page (:next_page data)
-        {:keys [scheme host port]} config]
-        (lazy-seq (cons data
-                        (if next-page (http/request (merge (default-request)
-                                         {:method :get
-                                          :scheme scheme
-                                          :server-name host
-                                          :server-port port
-                                          :uri next-page}))
-                                      ())))))
+(defn page-get [path & [params]]
+  (let [{:keys [status, body] :as page} (get path params)
+        token (:next_page_token body)]
+    (lazy-seq (cons page
+                    (if token
+                      (page-get path (assoc params :paging_token token))
+                      ())))))
+                      
 
 (def head (api-call :head))
 
