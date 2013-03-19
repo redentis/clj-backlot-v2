@@ -3,7 +3,7 @@
                  [org.apache.httpcomponents/httpclient "4.0.3"]
                  [commons-codec "1.4"]
                  [commons-io "1.4"]
-                 [cheshire "1.1.4"]
+                 [cheshire "5.0.1"]
                  [biz.source_code/base64coder "2010-12-19"]]
   :aot [org.apache.http.client.methods.HttpPatch]
   :min-lein-version "2.0.0"

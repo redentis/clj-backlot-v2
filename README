@@ -1,10 +1,25 @@
 # ooyala-backlot-v2
 
-FIXME: write description
+## Description
+A library providing access to the Ooyala [Backlot V2 APIs|http://support.ooyala.com/developers/documentation/concepts/book_api.html). 
+
+Using the library requires access to the API key and secret key for a Backlot account.
 
 ## Usage
 
-FIXME: write
+    (require (ooyala-backlot [assets :as a]
+                             [base :as b]))
+     
+    (def my_backlot (merge b/default-api-config {:api-key "..."
+                	                         :secret-key "..."}))
+    
+    (b/with-config my_backlot
+      (doseq [page   (a/list-assets)
+              asset  (:items page)]
+         (println (:title asset))))
+
+## APIs
+
 
 ## License
 
