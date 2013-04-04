@@ -20,7 +20,7 @@
 
 (defn parse-json
   "Deserialise the given JSON formatted string s to an object."
-  [s] (json/parse-string s :t))
+  [s] (json/parse-string s true))
 
 (def default-api-config {
                          :scheme "https"
@@ -101,8 +101,8 @@
 (defn- wrap-api-request [client]
   (fn [req]
     (let [resp (client req)]
-      (case (get-in resp [:headers "content-type"])
-        "application/json"
+      (if (.startsWith (get-in resp [:headers "content-type"])  
+                       "application/json")
         (update resp :body parse-json)
         resp))))
 
@@ -143,7 +143,7 @@
 
 (defn page-get [path & [params]]
   (let [{:keys [status, body] :as page} (get path params)
-        token (:next_page_token body)]
+        token (:next_page body)]
     (lazy-seq (cons page
                     (if token
                       (page-get path (assoc params :paging_token token))
